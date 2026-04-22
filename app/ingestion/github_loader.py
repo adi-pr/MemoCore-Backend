@@ -1,12 +1,23 @@
 import os
 
-def load_repo(path="./data/raw"):
-    files = []
+def load_markdown_files(repo_path="./data/raw"):
+    """
+    Loads all markdown files from a local GitHub Wiki.js backup.
+    Returns list of (file_path, content).
+    """
+    documents = []
 
-    for root, _, fns in os.walk(path):
-        for f in fns:
-            if f.endswith(".md"):
-                with open(os.path.join(root, f), "r") as file:
-                    files.append(file.read())
+    for root, _, files in os.walk(repo_path):
+        for file in files:
+            if file.endswith(".md"):
+                full_path = os.path.join(root, file)
 
-    return files
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                documents.append({
+                    "path": full_path,
+                    "content": content
+                })
+
+    return documents

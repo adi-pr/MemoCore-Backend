@@ -1,25 +1,33 @@
+from ingestion.chuncker import chunk_text
+from ingestion.github_loader import load_markdown_files
+from ingestion.parser import clean_markdown
 from core.llm import generate
 from core.embedder import embed
 import core.db
 
-notes = [
-    "Docker is a containerization platform that allows you to package applications and their dependencies into portable containers.",
-    "Chroma is a vector database used for semantic search.",
-    "Ollama is a tool that lets you run large language models locally on your machine. It enables running models like Llama 3 without cloud APIs."
-]
+docs = load_markdown_files()
 
-core.db.client.delete_collection("wiki")
-core.db.collection = core.db.client.create_collection("wiki")
+try:
+    core.db.client.delete_collection("wiki")
+except:
+    pass
 
-for i, note in enumerate(notes):
-    print(f"Adding note {i}: {note}")
-    core.db.collection.add(
-        documents=[note],
-        embeddings=[embed(note)],
-        ids=[f"note-{i}"]
-    )
+core.db.collection = core.db.client.get_or_create_collection("wiki")
 
-print("Indexed test notes.")
+for doc in docs:
+    clean = clean_markdown(doc["content"])
+    chunks = chunk_text(clean)
+
+    for i, chunk in enumerate(chunks):
+        vector = embed(chunk)
+
+        core.db.collection.add(
+            documents=[chunk],
+            embeddings=[vector],
+            ids=[f"{doc['path']}_{i}"]
+        )
+
+print("Wiki indexed successfully.")
 
 def ask(question):
     q_emb = embed(question)
@@ -31,8 +39,6 @@ def ask(question):
 
     context = "\n".join(results["documents"][0])
     
-    print("RESULTS:", results["documents"])
-
     response = generate(
         prompt=f"""
 Use the context to answer the question.
