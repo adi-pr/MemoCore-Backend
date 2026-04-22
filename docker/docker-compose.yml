@@ -1,0 +1,24 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: memocore_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: memocore_chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/.chroma/index
+    environment:
+      - IS_PERSISTENT=TRUE
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
