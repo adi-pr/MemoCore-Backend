@@ -1,24 +1,26 @@
 import ollama
 
-client = ollama.Client(
+_client = ollama.Client(
     host="http://localhost:11434",
 )
 
-def generate_stream(prompt: str, model: str = "llama3"):
-    response = client.chat(
+def generate(prompt: str, model: str = "llama3", stream: bool = False):
+    response = _client.chat(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        stream=True
+        stream=stream
     )
 
-    for chunk in response:
-        yield chunk["message"]["content"]
+    if stream:
+        for chunk in response:
+            yield chunk["message"]["content"]
+    else:
+        return response["message"]["content"]
 
-
-def generate(prompt: str, model: str = "llama3") -> str:
-    response = client.chat(
+def embed(text, model="nomic-embed-text"):
+    response = _client.embeddings(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
-        stream=False
+        prompt=text
     )
-    return response["message"]["content"]
+    
+    return response["embedding"]

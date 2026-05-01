@@ -2,8 +2,7 @@
 from typing import Any, Dict, List
 
 from chromadb import logger
-from services.ollama_client import generate, generate_stream
-from services.embeddings import embed
+from services.ollama_client import generate
 from db.retriver import get_relevant_docs
 
 def answer_query(question: str, n_results: int = 4) -> str:
@@ -72,7 +71,7 @@ Question:
 """
 
     try:
-        for token in generate_stream(prompt):
+        for token in generate(prompt, stream=True):
             yield token
 
     except Exception as exc:

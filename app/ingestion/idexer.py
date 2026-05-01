@@ -4,7 +4,7 @@ from chromadb import logger
 
 from ingestion.chuncker import chunk_text
 from ingestion.parser import clean_markdown
-from services.embeddings import embed
+from services.ollama_client import embed
 
 def index_documents(docs: List[Dict[str, Any]], collection: Any) -> None:
     """

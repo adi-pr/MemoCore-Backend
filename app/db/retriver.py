@@ -1,5 +1,5 @@
 from db.chroma_client import collection
-from services.embeddings import embed
+from services.ollama_client import embed
 
 def get_relevant_docs(query: str, top_k: int = 4):
     query_embedding = embed(query)
