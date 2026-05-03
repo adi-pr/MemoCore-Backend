@@ -29,8 +29,8 @@ export default function RootLayout({
         <ThemeProvider>
           <SidebarProvider>
             <AppSidebar/>
-              <main>
-                <SidebarTrigger/>
+              <main className="flex flex-col flex-1 min-w-0 h-svh">
+                <SidebarTrigger className="m-2 shrink-0"/>
                 {children}
               </main>
           </SidebarProvider>
