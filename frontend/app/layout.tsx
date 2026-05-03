@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono, Figtree } from "next/font/google"
 
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
@@ -23,7 +26,15 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", figtree.variable)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <SidebarProvider>
+            <AppSidebar/>
+              <main>
+                <SidebarTrigger/>
+                {children}
+              </main>
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
