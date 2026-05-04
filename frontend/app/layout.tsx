@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
 import { KnowledgeBaseProvider } from "@/components/knowledge-base-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'})
 
@@ -32,11 +33,13 @@ export default function RootLayout({
           <Toaster richColors />
           <KnowledgeBaseProvider>
             <SidebarProvider>
-              <AppSidebar/>
+              <TooltipProvider>
+                <AppSidebar/>
                 <main className="flex flex-col flex-1 min-w-0 h-svh">
                   <SidebarTrigger className="m-2 shrink-0"/>
                   {children}
                 </main>
+              </TooltipProvider>
             </SidebarProvider>
           </KnowledgeBaseProvider>
         </ThemeProvider>

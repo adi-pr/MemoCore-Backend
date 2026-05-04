@@ -18,6 +18,7 @@ import {
 import { Plus, Settings, Database, BookOpen, RefreshCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Sheet,
   SheetContent,
@@ -205,10 +206,15 @@ export function AppSidebar() {
             <BookOpen className="h-5 w-5 text-primary" />
             <span className="font-semibold text-base">MemoCore</span>
           </div>
-          <Button variant="ghost" size="icon-sm" onClick={() => void refreshKnowledgeBases()} disabled={isLoading}>
-            <RefreshCcw className="h-4 w-4" />
-            <span className="sr-only">Refresh knowledge bases</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" onClick={() => void refreshKnowledgeBases()} disabled={isLoading}>
+                <RefreshCcw className="h-4 w-4" />
+                <span className="sr-only">Refresh knowledge bases</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" >Refresh knowledge bases</TooltipContent>
+          </Tooltip>
         </div>
         <Button size="sm" className="w-full mt-2 gap-2" onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4" />
