@@ -57,6 +57,14 @@ def ensure_deploy_key() -> str:
     return key_path
 
 
+def get_public_deploy_key() -> str:
+    key_path = os.getenv("GITHUB_DEPLOY_KEY_PATH", _DEFAULT_KEY_PATH)
+    pub_key_path = f"{key_path}.pub"
+
+    with open(pub_key_path, "r", encoding="utf-8") as file_handle:
+        return file_handle.read().strip()
+
+
 def _parse_repo_url(url: str):
     """Extract owner and repo name from a GitHub URL."""
     match = re.match(

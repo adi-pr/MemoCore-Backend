@@ -4,11 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router
+from db.catalog import init_catalog
 from ingestion.github_loader import ensure_deploy_key
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_catalog()
     ensure_deploy_key()
     yield
 

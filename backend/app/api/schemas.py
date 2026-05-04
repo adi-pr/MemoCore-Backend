@@ -1,15 +1,17 @@
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, field_validator
-from typing import List, Optional
 
 
 class QueryRequest(BaseModel):
+    knowledge_base_id: str
     question: str
     top_k: Optional[int] = 4   # how many docs to retrieve
 
 
 class Source(BaseModel):
     content: str
-    metadata: Optional[dict] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class QueryResponse(BaseModel):
@@ -20,6 +22,7 @@ class QueryResponse(BaseModel):
 class GithubIngestRequest(BaseModel):
     repo_url: str
     branch: Optional[str] = None      # defaults to the repo's default branch
+    is_private: bool = False
 
     @field_validator("repo_url")
     @classmethod
@@ -29,6 +32,39 @@ class GithubIngestRequest(BaseModel):
         return v.strip()
 
 
+class KnowledgeBaseCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class KnowledgeBaseResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class KnowledgeBaseSourceResponse(BaseModel):
+    id: str
+    knowledge_base_id: str
+    source_type: str
+    repo_url: Optional[str] = None
+    branch: Optional[str] = None
+    path_prefix: Optional[str] = None
+    is_private: bool
+    status: str
+    last_indexed_at: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
 class GithubIngestResponse(BaseModel):
-    indexed: int
+    knowledge_base_id: str
+    source_id: str
+    ingestion_id: str
     repo_url: str
+    indexed_files: int
+    indexed_chunks: int
+    status: str
