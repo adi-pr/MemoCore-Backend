@@ -1,16 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Send, Bot, User } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-type Message = {
-  id: number
-  role: "user" | "assistant"
-  content: string
-}
+import { ChatComposer } from "@/components/chat/chat-composer"
+import { ChatMessages } from "@/components/chat/chat-messages"
+import { IndexRepoSheet } from "@/components/chat/index-repo-sheet"
+import type { Message } from "@/components/chat/types"
 
 const DEMO_MESSAGES: Message[] = [
   { id: 1, role: "assistant", content: "Hello! Ask me anything about your knowledge base." },
@@ -20,6 +14,8 @@ export default function Page() {
   const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES)
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isIndexing, setIsIndexing] = useState(false)
+  const [isIndexSheetOpen, setIsIndexSheetOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -73,65 +69,84 @@ export default function Page() {
     }
   }
 
+  async function handleIndexRepo(payload: { repo_url: string; branch?: string }) {
+    if (isStreaming || isIndexing) return
+
+    const trimmedRepoUrl = payload.repo_url.trim()
+    const trimmedBranch = payload.branch?.trim()
+
+    const statusId = Date.now()
+    setIsIndexing(true)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: statusId,
+        role: "assistant",
+          content: `Indexing repository: ${trimmedRepoUrl}${trimmedBranch ? ` (branch: ${trimmedBranch})` : ""}...`,
+      },
+    ])
+
+    try {
+      const res = await fetch("http://localhost:8000/ingest/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        const detail =
+          data && typeof data.detail === "string"
+            ? data.detail
+            : `Request failed with status ${res.status}`
+        throw new Error(detail)
+      }
+
+      const indexed = typeof data?.indexed === "number" ? data.indexed : 0
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === statusId
+            ? {
+                ...m,
+                content: `Indexed ${indexed} document${indexed === 1 ? "" : "s"} from ${trimmedRepoUrl}.`,
+              }
+            : m
+        )
+      )
+
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === statusId
+            ? { ...m, content: `Indexing failed: ${err instanceof Error ? err.message : "Something went wrong"}` }
+            : m
+        )
+      )
+    } finally {
+      setIsIndexing(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-svh w-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex items-start gap-3 max-w-2xl",
-              msg.role === "user" ? "ml-auto flex-row-reverse" : ""
-            )}
-          >
-            <div
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                msg.role === "assistant"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {msg.role === "assistant" ? (
-                <Bot className="h-4 w-4" />
-              ) : (
-                <User className="h-4 w-4" />
-              )}
-            </div>
-            <div
-              className={cn(
-                "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                msg.role === "assistant"
-                  ? "bg-muted text-foreground"
-                  : "bg-primary text-primary-foreground"
-              )}
-            >
-              {msg.content}
-              {isStreaming && msg.role === "assistant" && msg.id === messages[messages.length - 1].id && (
-                <span className="ml-0.5 inline-block w-1.5 h-3.5 bg-current align-middle animate-pulse rounded-sm" />
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
+      <IndexRepoSheet
+        open={isIndexSheetOpen}
+        onOpenChange={setIsIndexSheetOpen}
+        isIndexing={isIndexing}
+        onSubmit={handleIndexRepo}
+      />
 
-      {/* Input */}
-      <div className="border-t bg-background px-4 py-4">
-        <form onSubmit={handleSubmit} className="flex gap-2 max-w-2xl mx-auto">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question..."
-            disabled={isStreaming}
-            className="flex-1 tab-index-0"
-          />
-          <Button type="submit" disabled={!input.trim() || isStreaming} size="icon">
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
+      <ChatMessages messages={messages} isStreaming={isStreaming} bottomRef={bottomRef} />
+
+      <ChatComposer
+        input={input}
+        onInputChange={setInput}
+        onSubmit={handleSubmit}
+        onOpenIndexSheet={() => setIsIndexSheetOpen(true)}
+        isStreaming={isStreaming}
+        isIndexing={isIndexing}
+      />
     </div>
   )
 }
