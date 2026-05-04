@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
+import { KnowledgeBaseProvider } from "@/components/knowledge-base-provider"
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'})
 
@@ -27,13 +28,15 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <SidebarProvider>
-            <AppSidebar/>
-              <main className="flex flex-col flex-1 min-w-0 h-svh">
-                <SidebarTrigger className="m-2 shrink-0"/>
-                {children}
-              </main>
-          </SidebarProvider>
+          <KnowledgeBaseProvider>
+            <SidebarProvider>
+              <AppSidebar/>
+                <main className="flex flex-col flex-1 min-w-0 h-svh">
+                  <SidebarTrigger className="m-2 shrink-0"/>
+                  {children}
+                </main>
+            </SidebarProvider>
+          </KnowledgeBaseProvider>
         </ThemeProvider>
       </body>
     </html>

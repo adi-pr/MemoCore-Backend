@@ -3,19 +3,20 @@
 import { useState, useRef, useEffect } from "react"
 import { ChatComposer } from "@/components/chat/chat-composer"
 import { ChatMessages } from "@/components/chat/chat-messages"
-import { IndexRepoSheet } from "@/components/chat/index-repo-sheet"
 import type { Message } from "@/components/chat/types"
+import { useKnowledgeBase } from "@/components/knowledge-base-provider"
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
 
 const DEMO_MESSAGES: Message[] = [
   { id: 1, role: "assistant", content: "Hello! Ask me anything about your knowledge base." },
 ]
 
 export default function Page() {
+  const { selectedKnowledgeBaseId, selectedKnowledgeBase } = useKnowledgeBase()
   const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES)
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
-  const [isIndexing, setIsIndexing] = useState(false)
-  const [isIndexSheetOpen, setIsIndexSheetOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -27,6 +28,18 @@ export default function Page() {
     const trimmed = input.trim()
     if (!trimmed || isStreaming) return
 
+    if (!selectedKnowledgeBaseId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "assistant",
+          content: "Create or select a knowledge base first.",
+        },
+      ])
+      return
+    }
+
     const userMsg: Message = { id: Date.now(), role: "user", content: trimmed }
     const assistantId = Date.now() + 1
 
@@ -35,10 +48,13 @@ export default function Page() {
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }])
 
     try {
-      const res = await fetch("http://localhost:8000/ask/stream", {
+      const res = await fetch(`${API_BASE_URL}/ask/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          knowledge_base_id: selectedKnowledgeBaseId,
+          question: trimmed,
+        }),
       })
 
       if (!res.ok || !res.body) throw new Error(`Server error: ${res.status}`)
@@ -69,73 +85,11 @@ export default function Page() {
     }
   }
 
-  async function handleIndexRepo(payload: { repo_url: string; branch?: string }) {
-    if (isStreaming || isIndexing) return
-
-    const trimmedRepoUrl = payload.repo_url.trim()
-    const trimmedBranch = payload.branch?.trim()
-
-    const statusId = Date.now()
-    setIsIndexing(true)
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: statusId,
-        role: "assistant",
-          content: `Indexing repository: ${trimmedRepoUrl}${trimmedBranch ? ` (branch: ${trimmedBranch})` : ""}...`,
-      },
-    ])
-
-    try {
-      const res = await fetch("http://localhost:8000/ingest/github", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json().catch(() => null)
-
-      if (!res.ok) {
-        const detail =
-          data && typeof data.detail === "string"
-            ? data.detail
-            : `Request failed with status ${res.status}`
-        throw new Error(detail)
-      }
-
-      const indexed = typeof data?.indexed === "number" ? data.indexed : 0
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === statusId
-            ? {
-                ...m,
-                content: `Indexed ${indexed} document${indexed === 1 ? "" : "s"} from ${trimmedRepoUrl}.`,
-              }
-            : m
-        )
-      )
-
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === statusId
-            ? { ...m, content: `Indexing failed: ${err instanceof Error ? err.message : "Something went wrong"}` }
-            : m
-        )
-      )
-    } finally {
-      setIsIndexing(false)
-    }
-  }
-
   return (
     <div className="flex flex-col h-svh w-full">
-      <IndexRepoSheet
-        open={isIndexSheetOpen}
-        onOpenChange={setIsIndexSheetOpen}
-        isIndexing={isIndexing}
-        onSubmit={handleIndexRepo}
-      />
+      <div className="px-4 pb-2 text-xs text-muted-foreground">
+        Active knowledge base: {selectedKnowledgeBase?.name ?? "None selected"}
+      </div>
 
       <ChatMessages messages={messages} isStreaming={isStreaming} bottomRef={bottomRef} />
 
@@ -143,9 +97,7 @@ export default function Page() {
         input={input}
         onInputChange={setInput}
         onSubmit={handleSubmit}
-        onOpenIndexSheet={() => setIsIndexSheetOpen(true)}
         isStreaming={isStreaming}
-        isIndexing={isIndexing}
       />
     </div>
   )
