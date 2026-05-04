@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useKnowledgeBase } from "@/components/knowledge-base-provider"
+import { toast } from "sonner"
 
 export function AppSidebar() {
   const {
@@ -81,6 +82,7 @@ export function AppSidebar() {
         is_private: isPrivate,
       })
 
+      toast.success(`Knowledge base "${trimmedName}" created`, { position: "top-right"})
       setName("")
       setDescription("")
       setRepoUrl("")
@@ -88,7 +90,9 @@ export function AppSidebar() {
       setIsPrivate(false)
       setIsCreateOpen(false)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to create knowledge base")
+      const message = err instanceof Error ? err.message : "Failed to create knowledge base"
+      setFormError(message)
+      toast.error(message, { position: "top-right"})
     } finally {
       setIsCreating(false)
     }
