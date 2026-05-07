@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Figtree } from "next/font/google"
+import { Geist_Mono, Figtree } from "next/font/google"
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"

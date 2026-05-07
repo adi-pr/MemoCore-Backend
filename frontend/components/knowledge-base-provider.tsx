@@ -2,21 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
-
-export type KnowledgeBase = {
-  id: string
-  name: string
-  description?: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type GithubSourcePayload = {
-  repo_url: string
-  branch?: string
-  is_private: boolean
-}
+import {
+  apiFetch,
+  type CreateKnowledgeBaseInput,
+  type KnowledgeBase,
+  type UpdateKnowledgeBaseInput,
+} from "@/lib/api"
 
 type KnowledgeBaseContextValue = {
   knowledgeBases: KnowledgeBase[]
@@ -24,44 +15,46 @@ type KnowledgeBaseContextValue = {
   selectedKnowledgeBase: KnowledgeBase | null
   isLoading: boolean
   error: string | null
+  apiStatus: "checking" | "online" | "offline"
   refreshKnowledgeBases: () => Promise<void>
-  createKnowledgeBase: (name: string, description?: string) => Promise<KnowledgeBase>
-  addGithubSource: (knowledgeBaseId: string, payload: GithubSourcePayload) => Promise<void>
+  createKnowledgeBase: (payload: CreateKnowledgeBaseInput) => Promise<KnowledgeBase>
+  updateKnowledgeBase: (knowledgeBaseId: string, payload: UpdateKnowledgeBaseInput) => Promise<KnowledgeBase>
+  deleteKnowledgeBase: (knowledgeBaseId: string) => Promise<void>
   selectKnowledgeBase: (id: string) => Promise<void>
 }
 
 const KnowledgeBaseContext = createContext<KnowledgeBaseContextValue | null>(null)
-
-async function parseErrorMessage(res: Response): Promise<string> {
-  const data = await res.json().catch(() => null)
-  if (data && typeof data.detail === "string") return data.detail
-  return `Request failed with status ${res.status}`
-}
 
 export function KnowledgeBaseProvider({ children }: { children: React.ReactNode }) {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
   const [selectedKnowledgeBaseId, setSelectedKnowledgeBaseId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">("checking")
 
   const refreshKnowledgeBases = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const res = await fetch(`${API_BASE_URL}/knowledge-bases`)
-      if (!res.ok) throw new Error(await parseErrorMessage(res))
-
-      const list: KnowledgeBase[] = await res.json()
+      const list = await apiFetch<KnowledgeBase[]>("/knowledge-bases")
       setKnowledgeBases(list)
+      setApiStatus("online")
 
       setSelectedKnowledgeBaseId((prev) => {
-        if (!list.length) return null
-        if (prev && list.some((kb) => kb.id === prev)) return prev
+        if (!list.length) {
+          return null
+        }
+
+        if (prev && list.some((kb) => kb.id === prev)) {
+          return prev
+        }
+
         return list[0].id
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load knowledge bases")
+      setApiStatus("offline")
     } finally {
       setIsLoading(false)
     }
@@ -69,14 +62,15 @@ export function KnowledgeBaseProvider({ children }: { children: React.ReactNode 
 
   const selectKnowledgeBase = useCallback(async (id: string) => {
     setError(null)
-    try {
-      const res = await fetch(`${API_BASE_URL}/knowledge-bases/${id}`)
-      if (!res.ok) throw new Error(await parseErrorMessage(res))
 
-      const kb: KnowledgeBase = await res.json()
+    try {
+      const kb = await apiFetch<KnowledgeBase>(`/knowledge-bases/${id}`)
       setKnowledgeBases((prev) => {
         const exists = prev.some((item) => item.id === kb.id)
-        if (!exists) return [kb, ...prev]
+        if (!exists) {
+          return [kb, ...prev]
+        }
+
         return prev.map((item) => (item.id === kb.id ? kb : item))
       })
       setSelectedKnowledgeBaseId(kb.id)
@@ -85,44 +79,79 @@ export function KnowledgeBaseProvider({ children }: { children: React.ReactNode 
     }
   }, [])
 
-  const createKnowledgeBase = useCallback(async (name: string, description?: string) => {
+  const createKnowledgeBase = useCallback(async (payload: CreateKnowledgeBaseInput) => {
     setError(null)
 
-    const res = await fetch(`${API_BASE_URL}/knowledge-bases`, {
+    const created = await apiFetch<KnowledgeBase>("/knowledge-bases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), description: description?.trim() || undefined }),
+      body: JSON.stringify({
+        giturl: payload.giturl.trim(),
+        name: payload.name.trim(),
+        description: payload.description?.trim() || undefined,
+      }),
     })
 
-    if (!res.ok) {
-      throw new Error(await parseErrorMessage(res))
-    }
-
-    const created: KnowledgeBase = await res.json()
     setKnowledgeBases((prev) => [created, ...prev])
     setSelectedKnowledgeBaseId(created.id)
     return created
   }, [])
 
-  const addGithubSource = useCallback(async (knowledgeBaseId: string, payload: GithubSourcePayload) => {
-    const res = await fetch(`${API_BASE_URL}/knowledge-bases/${knowledgeBaseId}/sources/github`, {
-      method: "POST",
+  const updateKnowledgeBase = useCallback(async (knowledgeBaseId: string, payload: UpdateKnowledgeBaseInput) => {
+    setError(null)
+
+    const updated = await apiFetch<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        repo_url: payload.repo_url.trim(),
-        branch: payload.branch?.trim() || undefined,
-        is_private: payload.is_private,
+        giturl: payload.giturl?.trim() || undefined,
+        name: payload.name?.trim() || undefined,
+        description: payload.description?.trim() || undefined,
       }),
     })
 
-    if (!res.ok) {
-      throw new Error(await parseErrorMessage(res))
-    }
+    setKnowledgeBases((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+    setSelectedKnowledgeBaseId(updated.id)
+
+    return updated
   }, [])
 
+  const deleteKnowledgeBase = useCallback(
+    async (knowledgeBaseId: string) => {
+      setError(null)
+
+      await apiFetch<void>(`/knowledge-bases/${knowledgeBaseId}`, {
+        method: "DELETE",
+      })
+
+      setKnowledgeBases((prev) => {
+        const remaining = prev.filter((item) => item.id !== knowledgeBaseId)
+        setSelectedKnowledgeBaseId((selectedId) => {
+          if (selectedId !== knowledgeBaseId) {
+            return selectedId
+          }
+
+          return remaining[0]?.id ?? null
+        })
+        return remaining
+      })
+    },
+    []
+  )
+
   useEffect(() => {
-    void refreshKnowledgeBases()
+    const frame = window.requestAnimationFrame(() => {
+      void refreshKnowledgeBases()
+    })
+
+    return () => window.cancelAnimationFrame(frame)
   }, [refreshKnowledgeBases])
+
+  useEffect(() => {
+    apiFetch<{ status: string }>("/health")
+      .then(() => setApiStatus("online"))
+      .catch(() => setApiStatus("offline"))
+  }, [])
 
   const selectedKnowledgeBase = useMemo(
     () => knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null,
@@ -136,9 +165,11 @@ export function KnowledgeBaseProvider({ children }: { children: React.ReactNode 
       selectedKnowledgeBase,
       isLoading,
       error,
+      apiStatus,
       refreshKnowledgeBases,
       createKnowledgeBase,
-      addGithubSource,
+      updateKnowledgeBase,
+      deleteKnowledgeBase,
       selectKnowledgeBase,
     }),
     [
@@ -147,9 +178,11 @@ export function KnowledgeBaseProvider({ children }: { children: React.ReactNode 
       selectedKnowledgeBase,
       isLoading,
       error,
+      apiStatus,
       refreshKnowledgeBases,
       createKnowledgeBase,
-      addGithubSource,
+      updateKnowledgeBase,
+      deleteKnowledgeBase,
       selectKnowledgeBase,
     ]
   )
@@ -162,5 +195,6 @@ export function useKnowledgeBase() {
   if (!context) {
     throw new Error("useKnowledgeBase must be used within KnowledgeBaseProvider")
   }
+
   return context
 }
