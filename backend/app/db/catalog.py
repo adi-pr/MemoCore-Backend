@@ -85,3 +85,49 @@ def get_knowledge_base(knowledge_base_id: str) -> Optional[Dict[str, Any]]:
         ).fetchone()
 
     return _row_to_dict(row)
+
+
+def update_knowledge_base(
+    knowledge_base_id: str,
+    giturl: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    current = get_knowledge_base(knowledge_base_id)
+    if current is None:
+        return None
+
+    now = _utcnow()
+    with _connect() as connection:
+        connection.execute(
+            """
+            UPDATE knowledge_bases
+            SET giturl = ?,
+                name = ?,
+                description = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                current["giturl"] if giturl is None else giturl,
+                current["name"] if name is None else name,
+                current["description"] if description is None else description,
+                now,
+                knowledge_base_id,
+            ),
+        )
+
+    return get_knowledge_base(knowledge_base_id)
+
+
+def delete_knowledge_base(knowledge_base_id: str) -> bool:
+    with _connect() as connection:
+        result = connection.execute(
+            """
+            DELETE FROM knowledge_bases
+            WHERE id = ?
+            """,
+            (knowledge_base_id,),
+        )
+
+    return result.rowcount > 0

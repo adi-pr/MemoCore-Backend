@@ -38,6 +38,22 @@ class KnowledgeBaseCreateRequest(BaseModel):
         return candidate
 
 
+class KnowledgeBaseUpdateRequest(BaseModel):
+    giturl: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+    @field_validator("giturl")
+    @classmethod
+    def must_be_github_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        candidate = v.strip()
+        if not candidate.startswith("https://github.com/"):
+            raise ValueError("giturl must be a https://github.com/... URL")
+        return candidate
+
+
 class KnowledgeBaseResponse(BaseModel):
     id: str
     giturl: str
