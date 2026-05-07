@@ -17,6 +17,9 @@ from db.catalog import (
     list_knowledge_bases,
     update_knowledge_base,
 )
+from db.chroma_client import collection
+from ingestion.github_loader import get_public_deploy_key, load_from_github
+from ingestion.idexer import clear_source_documents, index_documents
 from services.rag_pipeline import answer_query, answer_query_stream
 
 router = APIRouter()
@@ -65,9 +68,65 @@ def _require_knowledge_base(knowledge_base_id: str):
     return knowledge_base
 
 
+def _private_repo_hint() -> str:
+    try:
+        public_key = get_public_deploy_key()
+    except OSError:
+        return ""
+
+    return (
+        " If this is a private repo, add this deploy key to the repository "
+        f"(Settings -> Deploy keys): {public_key}"
+    )
+
+
+def _github_access_hint(error_message: str) -> str:
+    access_error_markers = (
+        "git clone failed",
+        "permission denied",
+        "repository not found",
+        "could not read from remote repository",
+    )
+    lowered = error_message.lower()
+    if any(marker in lowered for marker in access_error_markers):
+        return _private_repo_hint()
+
+    return ""
+
+
 @router.post("/knowledge-bases", response_model=KnowledgeBaseResponse)
 def create_knowledge_base_route(payload: KnowledgeBaseCreateRequest):
     knowledge_base = create_knowledge_base(payload.giturl, payload.name, payload.description)
+
+    source_id = f"kb:{knowledge_base['id']}"
+    try:
+        docs = load_from_github(repo_url=payload.giturl, branch=None)
+        clear_source_documents(collection, knowledge_base["id"], source_id)
+        index_documents(
+            [
+                {
+                    **document,
+                    "knowledge_base_id": knowledge_base["id"],
+                    "source_id": source_id,
+                    "repo_url": payload.giturl,
+                    "branch": "",
+                }
+                for document in docs
+            ],
+            collection,
+        )
+    except ValueError as exc:
+        clear_source_documents(collection, knowledge_base["id"], source_id)
+        delete_knowledge_base(knowledge_base["id"])
+        raise HTTPException(
+            status_code=422,
+            detail=f"{exc}{_github_access_hint(str(exc))}",
+        )
+    except Exception as exc:
+        clear_source_documents(collection, knowledge_base["id"], source_id)
+        delete_knowledge_base(knowledge_base["id"])
+        raise HTTPException(status_code=500, detail=str(exc))
+
     return KnowledgeBaseResponse(**knowledge_base)
 
 

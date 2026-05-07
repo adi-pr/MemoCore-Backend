@@ -13,6 +13,8 @@ def generate(prompt: str, model: str = LLM_MODEL, stream: bool = False):
         stream=stream
     )
 
+    print("Prompt sent to Ollama:", prompt)
+
     if stream:
         for chunk in response:
             yield chunk["message"]["content"]
