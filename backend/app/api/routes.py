@@ -1,4 +1,5 @@
 from typing import List
+import uuid
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -8,19 +9,13 @@ from api.schemas import (
     GithubIngestResponse,
     KnowledgeBaseCreateRequest,
     KnowledgeBaseResponse,
-    KnowledgeBaseSourceResponse,
     QueryRequest,
     QueryResponse,
 )
 from db.catalog import (
-    complete_ingestion,
-    create_github_source,
-    create_ingestion,
     create_knowledge_base,
-    fail_ingestion,
     get_knowledge_base,
     list_knowledge_bases,
-    list_sources,
 )
 from services.rag_pipeline import answer_query, answer_query_stream
 from ingestion.github_loader import get_public_deploy_key, load_from_github
@@ -105,7 +100,7 @@ def _github_access_hint(error_message: str, is_private: bool) -> str:
 
 @router.post("/knowledge-bases", response_model=KnowledgeBaseResponse)
 def create_knowledge_base_route(payload: KnowledgeBaseCreateRequest):
-    knowledge_base = create_knowledge_base(payload.name, payload.description)
+    knowledge_base = create_knowledge_base(payload.giturl, payload.name, payload.description)
     return KnowledgeBaseResponse(**knowledge_base)
 
 
@@ -120,68 +115,50 @@ def get_knowledge_base_route(knowledge_base_id: str):
     return KnowledgeBaseResponse(**knowledge_base)
 
 
-@router.get(
-    "/knowledge-bases/{knowledge_base_id}/sources",
-    response_model=List[KnowledgeBaseSourceResponse],
-)
-def list_knowledge_base_sources(knowledge_base_id: str):
-    _require_knowledge_base(knowledge_base_id)
-    return [KnowledgeBaseSourceResponse(**item) for item in list_sources(knowledge_base_id)]
-
-
 @router.post(
     "/knowledge-bases/{knowledge_base_id}/sources/github",
     response_model=GithubIngestResponse,
 )
 def ingest_github(knowledge_base_id: str, payload: GithubIngestRequest):
-    _require_knowledge_base(knowledge_base_id)
-
-    source = create_github_source(
-        knowledge_base_id=knowledge_base_id,
-        repo_url=payload.repo_url,
-        branch=payload.branch,
-        is_private=payload.is_private,
-    )
-    ingestion = create_ingestion(knowledge_base_id, source["id"])
+    knowledge_base = _require_knowledge_base(knowledge_base_id)
+    repo_url = (knowledge_base.get("giturl") or "").strip()
+    if not repo_url:
+        raise HTTPException(
+            status_code=422,
+            detail="Knowledge base is missing giturl",
+        )
+    source_id = f"kb:{knowledge_base_id}"
+    ingestion_id = str(uuid.uuid4())
 
     try:
-        docs = load_from_github(repo_url=payload.repo_url, branch=payload.branch)
-        clear_source_documents(collection, knowledge_base_id, source["id"])
+        docs = load_from_github(repo_url=repo_url, branch=payload.branch)
+        clear_source_documents(collection, knowledge_base_id, source_id)
         indexed = index_documents(
             [
                 {
                     **document,
                     "knowledge_base_id": knowledge_base_id,
-                    "source_id": source["id"],
-                    "repo_url": payload.repo_url,
+                    "source_id": source_id,
+                    "repo_url": repo_url,
                     "branch": payload.branch or "",
                 }
                 for document in docs
             ],
             collection,
         )
-        complete_ingestion(
-            ingestion["id"],
-            source["id"],
-            files_seen=len(docs),
-            files_indexed=indexed["files_indexed"],
-            chunks_indexed=indexed["chunks_indexed"],
-        )
     except ValueError as exc:
-        fail_ingestion(ingestion["id"], source["id"], str(exc))
         raise HTTPException(
             status_code=422,
             detail=f"{exc}{_github_access_hint(str(exc), payload.is_private)}",
         )
     except Exception as exc:
-        fail_ingestion(ingestion["id"], source["id"], str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
     return GithubIngestResponse(
         knowledge_base_id=knowledge_base_id,
-        source_id=source["id"],
-        ingestion_id=ingestion["id"],
-        repo_url=payload.repo_url,
+        source_id=source_id,
+        ingestion_id=ingestion_id,
+        repo_url=repo_url,
         indexed_files=indexed["files_indexed"],
         indexed_chunks=indexed["chunks_indexed"],
         status="completed",

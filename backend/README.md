@@ -77,6 +77,26 @@ curl http://localhost:8080/index
 - `POST /ask` - query the RAG pipeline and return JSON response
 - `POST /ask/stream` - query the RAG pipeline with streaming text response
 
+Knowledge bases are stored in SQL with `name`, `description`, and `giturl`.
+
+### Create Knowledge Base Example
+
+```bash
+curl -X POST http://localhost:8080/knowledge-bases \
+	-H "Content-Type: application/json" \
+	-d '{"name":"Docs KB","description":"Main project docs","giturl":"https://github.com/owner/repo"}'
+```
+
+### Ingest GitHub Source Example
+
+The ingest endpoint now uses the knowledge base `giturl` (stored in SQL), so only branch/private flags are needed.
+
+```bash
+curl -X POST http://localhost:8080/knowledge-bases/<KB_ID>/sources/github \
+	-H "Content-Type: application/json" \
+	-d '{"branch":"main","is_private":true}'
+```
+
 ### `POST /ask/stream` example
 
 ```bash

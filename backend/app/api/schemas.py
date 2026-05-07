@@ -20,42 +20,29 @@ class QueryResponse(BaseModel):
 
 
 class GithubIngestRequest(BaseModel):
-    repo_url: str
     branch: Optional[str] = None      # defaults to the repo's default branch
     is_private: bool = False
 
-    @field_validator("repo_url")
-    @classmethod
-    def must_be_github_url(cls, v: str) -> str:
-        if not v.strip().startswith("https://github.com/"):
-            raise ValueError("repo_url must be a https://github.com/... URL")
-        return v.strip()
-
 
 class KnowledgeBaseCreateRequest(BaseModel):
+    giturl: str
     name: str
     description: Optional[str] = None
+
+    @field_validator("giturl")
+    @classmethod
+    def must_be_github_url(cls, v: str) -> str:
+        candidate = v.strip()
+        if not candidate.startswith("https://github.com/"):
+            raise ValueError("giturl must be a https://github.com/... URL")
+        return candidate
 
 
 class KnowledgeBaseResponse(BaseModel):
     id: str
+    giturl: str
     name: str
     description: Optional[str] = None
-    created_at: str
-    updated_at: str
-
-
-class KnowledgeBaseSourceResponse(BaseModel):
-    id: str
-    knowledge_base_id: str
-    source_type: str
-    repo_url: Optional[str] = None
-    branch: Optional[str] = None
-    path_prefix: Optional[str] = None
-    is_private: bool
-    status: str
-    last_indexed_at: Optional[str] = None
-    error_message: Optional[str] = None
     created_at: str
     updated_at: str
 
