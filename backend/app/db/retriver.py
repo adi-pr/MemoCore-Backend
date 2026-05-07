@@ -8,6 +8,7 @@ def get_relevant_docs(query: str, knowledge_base_id: str, top_k: int = 4):
         query_embeddings=[query_embedding],
         n_results=top_k,
         where={"knowledge_base_id": knowledge_base_id},
+        include=["documents", "metadatas"] 
     )
 
     return results

@@ -48,6 +48,7 @@ def answer_query_stream(question: str, knowledge_base_id: str, n_results: int = 
 
     try:
         results = get_relevant_docs(question, knowledge_base_id, n_results)
+        print("Retrieved results:", len(results.get("documents", [])), "documents")
     except Exception as exc:
         logger.exception("Query failed: %s", exc)
         yield "Error: query failed."
