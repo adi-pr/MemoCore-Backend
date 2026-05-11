@@ -2,7 +2,7 @@
 from typing import Any, Dict, List
 
 from chromadb import logger
-from db.retriver import get_relevant_docs
+from db.retriver import hybrid_search
 from services.ollama_client import generate
 
 def answer_query(question: str, knowledge_base_id: str, n_results: int = 4) -> Dict[str, Any]:
@@ -14,7 +14,7 @@ def answer_query(question: str, knowledge_base_id: str, n_results: int = 4) -> D
         return {"answer": "Please provide a non-empty question.", "sources": []}
 
     try:
-        results = get_relevant_docs(question, knowledge_base_id, n_results)
+        results = hybrid_search(question, knowledge_base_id, n_results)
     except Exception as exc:
         logger.exception("Query failed: %s", exc)
         return {"answer": "Error: query failed.", "sources": []}
@@ -47,7 +47,7 @@ def answer_query_stream(question: str, knowledge_base_id: str, n_results: int = 
         return
 
     try:
-        results = get_relevant_docs(question, knowledge_base_id, n_results)
+        results = hybrid_search(question, knowledge_base_id, n_results)
         print("Retrieved results:", len(results.get("documents", [])), "documents")
     except Exception as exc:
         logger.exception("Query failed: %s", exc)

@@ -11,7 +11,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
@@ -283,7 +282,11 @@ export function AppSidebar() {
                     <div className="flex items-start gap-2 px-1">
                       <SidebarMenuButton
                         isActive={selectedKnowledgeBaseId === kb.id}
-                        className="h-auto min-h-12 flex-1 items-start py-2"
+                        className={`h-auto min-h-12 flex-1 items-start py-2 ${
+                          selectedKnowledgeBaseId === kb.id
+                            ? "rounded-md border border-emerald-500/35 bg-emerald-500/12"
+                            : ""
+                        }`}
                         onClick={() => void selectKnowledgeBase(kb.id)}
                       >
                         <div className="min-w-0 text-left">
@@ -291,7 +294,6 @@ export function AppSidebar() {
                           <div className="truncate text-xs text-muted-foreground">{kb.giturl}</div>
                         </div>
                       </SidebarMenuButton>
-                      <SidebarMenuBadge>{selectedKnowledgeBaseId === kb.id ? "Active" : ""}</SidebarMenuBadge>
                     </div>
                   </SidebarMenuItem>
                 ))}
